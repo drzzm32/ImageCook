@@ -219,9 +219,9 @@ namespace ImageCook
                 ImageFormat format = ImageFormat.Bmp;
                 switch (saveDialog.FilterIndex)
                 {
-                    case 0: format = ImageFormat.Jpeg; break;
-                    case 1: format = ImageFormat.Bmp; break;
-                    case 2: format = ImageFormat.Png; break;
+                    case 1: format = ImageFormat.Jpeg; break;
+                    case 2: format = ImageFormat.Bmp; break;
+                    case 3: format = ImageFormat.Png; break;
                 }
                 bitmap.Save(saveDialog.FileName, format);
             }
