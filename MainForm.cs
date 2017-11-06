@@ -120,6 +120,7 @@ namespace ImageCook
 
             proBar.Value = 50;
 
+            
             for (int channel = 0; channel < 3; channel++)
             {
                 double max = _max(rawBmp, channel), min = _min(rawBmp, channel);
@@ -129,7 +130,12 @@ namespace ImageCook
                 for (int i = 0; i < bitmap.Height; i++)
                     for (int j = 0; j < bitmap.Width; j++)
                     {
-                        rawBmp[i, j, channel] = (rawBmp[i, j, channel] - min) / (max - min) * 255;
+                        if (_sum(template) == 0)
+                            rawBmp[i, j, channel] = (rawBmp[i, j, channel] - min) / (max - min) * 255;
+                        else
+                            rawBmp[i, j, channel] = rawBmp[i, j, channel] > 255 ? 255 : (
+                                rawBmp[i, j, channel] < 0 ? 0 : rawBmp[i, j, channel]
+                            );
                         loopBar.PerformStep();
                     }
 
@@ -157,6 +163,14 @@ namespace ImageCook
             proBar.Value = 100;
 
             dstBox.Image = bitmap;
+        }
+
+        protected int _sum(int[,] data)
+        {
+            int sum = 0;
+            foreach (int a in data)
+                sum += a;
+            return sum;
         }
 
         protected double _max(double[,,] data, int channel)
