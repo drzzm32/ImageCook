@@ -1,11 +1,13 @@
 ﻿using System;
 using System.Drawing;
 using System.Threading;
+using System.Drawing.Imaging;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 
 namespace ImageCook
 {
-    public static class MultiCook
+    public class MultiCook
     {
         public class Rect
         {
@@ -51,18 +53,25 @@ namespace ImageCook
 
             public Image(Bitmap bitmap, Rect rect) : this(rect.Width, rect.Height)
             {
+                Rectangle region = new Rectangle(0, 0, bitmap.Width, bitmap.Height);
+                BitmapData bitmapData = bitmap.LockBits(region, ImageLockMode.ReadOnly, PixelFormat.Format32bppArgb);
+                IntPtr imgPtr = bitmapData.Scan0;
+
                 for (int x = 0; x < Width; x++)
                 {
                     if (rect.X + x >= bitmap.Width) continue;
                     for (int y = 0; y < Height; y++)
                     {
                         if (rect.Y + y >= bitmap.Height) continue;
-                        R[x, y] = Convert.ToDouble(bitmap.GetPixel(rect.X + x, rect.Y + y).R);
-                        G[x, y] = Convert.ToDouble(bitmap.GetPixel(rect.X + x, rect.Y + y).G);
-                        B[x, y] = Convert.ToDouble(bitmap.GetPixel(rect.X + x, rect.Y + y).B);
-                        A[x, y] = Convert.ToDouble(bitmap.GetPixel(rect.X + x, rect.Y + y).A);
+
+                        A[x, y] = Marshal.ReadByte(imgPtr, (rect.X + x + (rect.Y + y) * bitmap.Width) * 4 + 3);
+                        R[x, y] = Marshal.ReadByte(imgPtr, (rect.X + x + (rect.Y + y) * bitmap.Width) * 4 + 2);
+                        G[x, y] = Marshal.ReadByte(imgPtr, (rect.X + x + (rect.Y + y) * bitmap.Width) * 4 + 1);
+                        B[x, y] = Marshal.ReadByte(imgPtr, (rect.X + x + (rect.Y + y) * bitmap.Width) * 4 + 0);
                     }
                 }
+
+                bitmap.UnlockBits(bitmapData);
             }
 
             public Image(Bitmap bitmap) : this(bitmap, new Rect(0, 0, bitmap.Width, bitmap.Height)) { }
@@ -178,6 +187,92 @@ namespace ImageCook
                     }
                 }
                 return bitmap;
+            }
+        }
+
+        public class TaskPool
+        {
+            public class Task
+            {
+                public Rect Origional { get; protected set; }
+                public Image Input { get; protected set; }
+                public Image Output { get; protected set; }
+
+                public Task(Rect origional, Image input)
+                {
+                    Origional = new Rect(origional);
+                    Input = new Image(input);
+                    Output = null;
+                }
+
+                public Task(int x, int y, int width, int height, Image input)
+                {
+                    Origional = new Rect(x, y, width, height);
+                    Input = new Image(input);
+                    Output = null;
+                }
+
+                public void Work(int[,] filter, double scale)
+                {
+                    Output = Input.ApplyFilter(filter, scale);
+                }
+            }
+
+            protected Stack<Task> tasks;
+            private readonly object _lock = new object();
+
+            public int Count {
+                get
+                {
+                    try
+                    {
+                        Monitor.Enter(_lock);
+                        return tasks.Count;
+                    }
+                    finally
+                    {
+                        Monitor.Exit(_lock);
+                    }
+                }
+            }
+            
+            public TaskPool()
+            {
+                tasks = new Stack<Task>();
+            }
+
+            public void AddTask(Task task)
+            {
+                Monitor.Enter(_lock);
+                tasks.Push(task);
+                Monitor.Exit(_lock);
+            }
+
+            public bool HasTask()
+            {
+                try
+                {
+                    Monitor.Enter(_lock);
+                    return tasks.Count != 0;
+                }
+                finally
+                {
+                    Monitor.Exit(_lock);
+                }
+            }
+
+            public Task PullTask()
+            {
+                try
+                {
+                    Monitor.Enter(_lock);
+                    if (tasks.Count == 0) return null;
+                    return tasks.Pop();
+                }
+                finally
+                {
+                    Monitor.Exit(_lock);
+                }
             }
         }
     }
