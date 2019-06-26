@@ -103,7 +103,8 @@ namespace ImageCook
             Refresh(); Application.DoEvents();
 
             // convert data
-            MultiCook.Image image = new MultiCook.Image(bitmap);
+            MultiCook.Image image = null;
+            WorkOnThread(() => image = new MultiCook.Image(bitmap));
             proBar.Value = 20;
             Refresh(); Application.DoEvents();
 
@@ -127,18 +128,21 @@ namespace ImageCook
 
                 // task division
                 int wid = image.Width - siz_h, hit = image.Height - siz_h;
-                for (int x = siz_h; x < wid; x += siz_c)
+                WorkOnThread(() =>
                 {
-                    for (int y = siz_h; y < hit; y += siz_c)
+                    for (int x = siz_h; x < wid; x += siz_c)
                     {
-                        MultiCook.Rect rect = new MultiCook.Rect(x, y, siz_c, siz_c);
-                        if (x + siz_c >= wid || y + siz_c >= hit)
-                            rect = new MultiCook.Rect(x, y, wid - x, hit - y);
-                        MultiCook.Image clip = image.Get(rect.Expand(siz_h, siz_h));
-                        MultiCook.TaskPool.Task task = new MultiCook.TaskPool.Task(rect, clip);
-                        inputPool.AddTask(task);
+                        for (int y = siz_h; y < hit; y += siz_c)
+                        {
+                            MultiCook.Rect rect = new MultiCook.Rect(x, y, siz_c, siz_c);
+                            if (x + siz_c >= wid || y + siz_c >= hit)
+                                rect = new MultiCook.Rect(x, y, wid - x, hit - y);
+                            MultiCook.Image clip = image.Get(rect.Expand(siz_h, siz_h));
+                            MultiCook.TaskPool.Task task = new MultiCook.TaskPool.Task(rect, clip);
+                            inputPool.AddTask(task);
+                        }
                     }
-                }
+                });
 
                 int sumTasks = inputPool.Count;
                 loopBar.Maximum = sumTasks;
@@ -166,17 +170,20 @@ namespace ImageCook
                     Refresh();
                     Application.DoEvents();
                 }
-                loopBar.Value = sumTasks;
+                loopBar.Value = loopBar.Maximum;
 
                 // merge result
-                while (outputPool.HasTask())
+                WorkOnThread(() =>
                 {
-                    var task = outputPool.PullTask();
-                    if (task != null)
+                    while (outputPool.HasTask())
                     {
-                        output.Set(task.Origional.X - siz_h, task.Origional.Y - siz_h, task.Output);
+                        var task = outputPool.PullTask();
+                        if (task != null)
+                        {
+                            output.Set(task.Origional.X - siz_h, task.Origional.Y - siz_h, task.Output);
+                        }
                     }
-                }
+                });
             }
             int end = Environment.TickCount;
             proBar.Value = 50;
@@ -188,7 +195,8 @@ namespace ImageCook
             Refresh(); Application.DoEvents();
 
             // convert data
-            Bitmap result = output.ToBitmap();
+            Bitmap result = null;
+            WorkOnThread(() => result = output.ToBitmap());
             proBar.Value = 100;
             Refresh(); Application.DoEvents();
 
